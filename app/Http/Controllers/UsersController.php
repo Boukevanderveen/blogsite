@@ -8,60 +8,108 @@ use App\Models\User;
 use App\Models\Article;
 use Illuminate\Support\Facades\DB;
 use Auth;
+use Illuminate\Foundation\Http\FormRequest;
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
+
 
 class UsersController extends Controller
 {
-    function manageUserView(User $user)
+    function index(User $user)
     {
-        if (auth()->user()->can('update', $user)) 
-        {
-            $users = User::All();
-           
-            return view('/users/manageusers', ['users' => $users]);
-        }
-        else
-        {           
-            return redirect('');
-        }
+        $this->authorize('update', $user);
+        $users = User::latest()->paginate(6);
+        return view('users.index', ['users' => $users, 'user' => $users]);
     }
 
-    function removeAdmin(Request $request, User $user)
+    function create()
     {
-        if (auth()->user()->can('update', $user)) 
-        {
-            $query = User::where('id', $request->id)->update(['isAdmin' => 0]);
-            if($query)
-            {
-            return redirect('/home/manageusers');
-            }
-            else
-            {
-                // ERROR
-            }
-        }
-        else
-        {
-            return redirect('');
-        }
+        return view('users.create');
     }
 
-    function makeAdmin(Request $request, User $user)
+    function edit($id, User $user)
     {
-        if (auth()->user()->can('update', $user)) 
-        {
-            $query = User::where('id', $request->id)->update(['isAdmin' => 1]);
-            if($query)
-            {
-            return redirect('/home/manageusers');
-            }
-            else
-            {
-                // ERROR
-            }
-        }
-        else
-        {
-            return redirect('');
-        }  
+        $this->authorize('update', $user);
+        $user = User::where('id', $id)->get();
+        return view('users.edit', ['user' => $user]);
+    }
+
+    function store(StoreUserRequest $request)
+    {
+        $User = new User;
+        $User->name = $request->name;
+        $User->email = $request->email;
+        $User->password = bcrypt($request->password);
+        $User->isAdmin = 0;
+        $User->isOwner = 0;
+        $User->save();
+        return redirect('/users');
+    }
+
+    function update(UpdateUserRequest $request, User $user)
+    {
+        $this->authorize('update', $user);
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->password = $request->password;
+        $user->isadmin = 0;
+        $user->isowner = 0;
+        $user->save();
+        return redirect('/users')->with('message', 'Gebruiker succesvol bewerkt.');
+    }
+
+    function destroy(Request $request, User $user)
+    {
+        $this->authorize('delete', $user);
+        $user->delete();
+        return back()->with('message', 'Gebruiker succesvol verwijderd.');
+    }
+
+    function adminIndex(User $user)
+    {
+        $this->authorize('update', $user);
+        $users = User::latest()->paginate(6);
+        return view('admin.users.index', ['users' => $users]);
+    }
+
+    function adminCreate()
+    {
+        return view('admin.users.create');
+    }
+
+    function adminEdit($id, User $user)
+    {
+        $this->authorize('update', $user);
+        $user = User::where('id', $id)->get();
+        return view('admin.users.edit', ['user' => $user]);
+    }
+
+    function adminStore(StoreUserRequest $request)
+    {
+        $User = new User;
+        $User->name = $request->name;
+        $User->email = $request->email;
+        $User->password = bcrypt($request->password);
+        $User->isAdmin = 0;
+        $User->isOwner = 0;
+        $User->save();
+        return redirect('/admin/users');
+    }
+
+    function adminUpdate(UpdateUserRequest $request, User $user)
+    {
+        $this->authorize('update', $user);
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->password = $request->password;
+        $user->save();
+        return redirect('/admin/users')->with('message', 'Gebruiker succesvol bewerkt.');
+    }
+
+    function adminDestroy(Request $request, User $user)
+    {
+        $this->authorize('delete', $user);
+        $user->delete();
+        return back()->with('message', 'Gebruiker succesvol verwijderd.');
     }
 }

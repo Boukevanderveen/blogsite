@@ -5,119 +5,188 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Article;
 use App\Models\User;
+use App\Models\Category;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Http\FormRequest;
+use App\Http\Requests\StoreArticleRequest;
+use App\Http\Requests\UpdateArticleRequest;
 
 class ArticlesController extends Controller
 {
 
-    function dashboardView()
+    function index(Article $article)
     {
-        $articles = Article::All();
-
-        return view('articles/dashboard', ['articles' => $articles]);
+        $articles = Article::latest()->paginate(6);
+        $categories = Category::all();
+        // compact('variable', 'variable')
+        return view('articles.index', ['articles' => $articles, 'categories' => $categories, 'article' => $article]);
     }
 
-    function articleView($id)
+    function show(Article $article)
     {
-        $article = Article::where('id', $id)->get();
+        $this->authorize('viewAny', $article);
 
-        return view('articles/article', ['article' => $article]);
+        return view('articles.show', ['article' => $article]);
     }
 
-    function editView($id, Article $article)
+    function create(Article $article)
     {
-        if (auth()->user()->can('update', $article)) {
-        $article = Article::where('id', $id)->get();
-        return view('/articles/editarticle', ['article' => $article]);
-        }
-        else{
-            return redirect('/articles/dashboard');
-        }
+        $this->authorize('create', $article);
+
+        $categories = Category::all();
+        return view('articles.create', ['categories' => $categories]);
     }
 
-    function createView(Article $article)
+    function store(StoreArticleRequest $request, Article $article)
     {
-        if (auth()->user()->can('create', $article)) 
+        $this->authorize('create', $article);
+
+        $Articles = new Article;
+        if ($request->hasFile('image')) 
         {
-            return view('articles/createarticle');
+            $fileName = time() . '.' . $request->image->extension();
+            $request->image->move(public_path('/images/articles/' . $Articles->id) . '/', $fileName);
+            $Articles->image = $fileName;
         }
-        else
-        {
-            return redirect('');
-        }
+        $Articles->title = $request->title;
+        $Articles->description = $request->description;
+        $Articles->content = $request->content;
+        $Articles->author = Auth::user()->name;
+        $Articles->category = $request->category;
+        $Articles->published_at = $request->published_at;
+        $Articles->save();
+        return redirect('articles')->with('message', 'Artikel succesvol gecreëerd.'); 
     }
 
-    function create(Request $request, Article $article)
+    function categoriesShow($category)
     {
-        if (auth()->user()->can('create', $article)) {
-            $validator = Validator::make($request->all(), [
-                'title' => 'required|min:5',
-                'content' => 'required', // required and number field validation
+        $this->authorize('view', $article);
+
+        $articles = Article::latest()->where('category', $category)->paginate(6);
+        $categories = Category::all();
+        return view('articles.index', ['articles' => $articles, 'categories' => $categories]);
+    }
     
-            ]); // create the validations
-            if ($validator->fails())
-            {
-                return back()->withInput()->withErrors($validator);
-            } 
-            else
-            {
-                $Articles = new Article;
-                $Articles->title = $request->title;
-                $Articles->description = $request->description;
-                $Articles->content = $request->content;
-                $author = Auth::user()->name;
-                $Articles->author = $author;
-    
-                $Articles->save();
-    
-                return redirect('home/articles');   
-            }
-            }
-            else
-            {
-                //ERROR
-            }
+    function edit(Article $article)
+    {
+        $this->authorize('update', $article);
+
+        $categories = Category::all();
+        return view('articles.edit', ['article' => $article, 'categories' => $categories]);
     }
 
-    function delete(Request $request, Article $article)
+    function update(UpdateArticleRequest $request, Article $article)
     {
-        if (auth()->user()->can('delete', $article)) 
+        $this->authorize('update', $article);
+
+        if ($request->hasFile('image')) 
         {
-            $query = Article::where('id', $request->articleid)->delete();
-            if($query)
-            {
-                return redirect('/home/articles');
-            }
-            else
-            {
-                //ERROR
-            }
+            $fileName = time() . '.' . $request->image->extension();
+            $file->move(public_path('/images/articles/' . $Articles->id), $fileName);
+            $article->image = $fileName;
         }
-        else
-        {
-                //ERROR
-        }
+
+        $article->title = $request->title;
+        $article->description = $request->description;
+        $article->content = $request->content;
+        $article->category = $request->category;
+        $article->published_at = $request->published_at;
+        $article->update();
+
+        return back()->with('message', 'Artikel succesvol bewerkt.');
+    }
+    
+    function destroy(Request $request, Article $article)
+    {
+        $this->authorize('delete', $article);
+
+        $article->delete();
+        return back()->with('message', 'Artikel succesvol verwijderd.');
     }
 
-    function update(Request $request, Article $article)
+
+    function adminIndex()
     {
-        if (auth()->user()->can('update', $article)) 
+        $articles = Article::latest()->paginate(6);
+        $categories = Category::all();
+        // compact('variable', 'variable')
+        return view('admin.articles.index', ['articles' => $articles, 'categories' => $categories]);
+    }
+
+    function adminCreate(Article $article)
+    {
+        $this->authorize('create', $article);
+
+        $categories = Category::all();
+        return view('admin.articles.create', ['categories' => $categories]);
+    }
+
+    function adminStore(StoreArticleRequest $request, Article $article)
+    {
+        $this->authorize('create', $article);
+
+        $Articles = new Article;
+        if ($request->hasFile('image')) 
         {
-            $query = Article::where('id', $request->id)->update(['title' => $request->title, 'description' => $request->description, 'content' => $request->content]);
-            if($query)
-            {
-                return redirect('articles/article/'.$request->id.'');
-            }
-            else
-            {
-                //ERROR
-            }
+            $fileName = time() . '.' . $request->image->extension();
+            $request->image->move(public_path('/images/articles/' . $Articles->id), $fileName);
+            $Articles->image = $fileName;
         }
-        else
+        $Articles->title = $request->title;
+        $Articles->description = $request->description;
+        $Articles->content = $request->content;
+        $Articles->author = Auth::user()->name;
+        $Articles->category = $request->category;
+        $Articles->published_at = $request->published_at;
+        $Articles->save();
+        return redirect('admin/articles')->with('message', 'Artikel succesvol gecreëerd.'); 
+    }
+
+    function adminCategoriesShow($category)
+    {
+        $this->authorize('view', $article);
+
+        $articles = Article::latest()->where('category', $category)->paginate(6);
+        $categories = Category::all();
+        return view('admin.articles.index', ['articles' => $articles, 'categories' => $categories]);
+    }
+    
+    function adminEdit(Article $article)
+    {
+        $this->authorize('update', $article);
+
+        $categories = Category::all();
+        return view('admin.articles.edit', ['article' => $article, 'categories' => $categories]);
+    }
+
+    function adminUpdate(UpdateArticleRequest $request, Article $article)
+    {
+        $this->authorize('update', $article);
+
+        if ($request->hasFile('image')) 
         {
-            //ERROR
+            $fileName = time() . '.' . $request->image->extension();
+            $file->move(public_path('/images/articles/' . $Articles->id), $fileName);
+            $article->image = $fileName;
         }
+
+        $article->title = $request->title;
+        $article->description = $request->description;
+        $article->content = $request->content;
+        $article->category = $request->category;
+        $article->published_at = $request->published_at;
+        $article->update();
+
+        return back()->with('message', 'Artikel succesvol bewerkt.');
+    }
+    
+    function adminDestroy(Request $request, Article $article)
+    {
+        $this->authorize('delete', $article);
+
+        $article->delete();
+        return back()->with('message', 'Artikel succesvol verwijderd.');
     }
 }

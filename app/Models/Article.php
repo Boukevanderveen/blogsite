@@ -13,6 +13,7 @@ class Article extends Model
     'title',
     'description',
     'content',
-    'author'
+    'author',
+    'article'
     ];
 }
